@@ -18,11 +18,11 @@ if ! command -v oci >/dev/null 2>&1; then
 fi
 
 # Define modular variables for Object Storage
-BUCKET_NAME="${BUCKET_NAME:-BV_OKE_init}" #Bucket where Block volume attachment script is stored
-OBJECT_PATH="${OBJECT_PATH:-initscripts/BV_OKE_init.sh}" #Path to block volume attachment script object
-NAMESPACE="${NAMESPACE:-idqnzqvxcj4a}" #tenancy Object Storage Namespace
-REGION="${REGION:-us-ashburn-1}" #Region where bucket is located
-SCRIPT_LOCAL_PATH="/tmp/BV_OKE_init.sh" #path to install script to 
+BUCKET_NAME="${BUCKET_NAME:-<bucket_name>}" #Bucket where Block volume attachment script is stored
+OBJECT_PATH="${OBJECT_PATH:-<object_path>}" #Path to block volume attachment script object
+NAMESPACE="${NAMESPACE:-<object_storage_namespace>}" #tenancy Object Storage Namespace
+REGION="${REGION:-Ex.<us-ashburn-1>}" #Region where bucket is located
+SCRIPT_LOCAL_PATH="/tmp/BV_OKE_Init.sh" #path to install script to 
 
 # Fetch script from Object Storage
 log "Fetching init script from Object Storage..."
