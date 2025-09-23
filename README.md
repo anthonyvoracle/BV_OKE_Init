@@ -37,16 +37,6 @@ Allow dynamic-group <Group_Name> to read object-family in compartment <Compartme
 ## Customization:
 Override default configuration by setting environment variables before running the script:
 
-VOL_SIZE_GB="${VOL_SIZE_GB:-100}"          # Default: 100 GB 
-VPUS_PER_GB="${VPUS_PER_GB:-10}"           # Default: 10 VPUs. e.g., 10,20,30
-MOUNT_POINT="${MOUNT_POINT:-/data}"        # Default: /data 
-FS_TYPE="${FS_TYPE:-xfs}"                  # Default: xfs. e.g., xfs or ext4
-VOLUME_COMPARTMENT_OCID="${VOLUME_COMPARTMENT_OCID:-}"  # Defaults to instance compartment if unset or empty
-ATTACH_TYPE="${ATTACH_TYPE:-paravirtualized}"           # Default: paravirtualized. e.g., paravirtualized or iscsi
-MOUNT_OWNER="${MOUNT_OWNER:-root}"         # Default: root
-MOUNT_GROUP="${MOUNT_GROUP:-root}"         # Default: root 
-MOUNT_PERMS="${MOUNT_PERMS:-755}"          # Default: 755
-
 - `VOL_SIZE_GB`: Volume size in GB (default: 100)
 - `VPUS_PER_GB`: Performance units per GB (default: 10)
 - `MOUNT_POINT`: Directory to mount the volume (default: `/data`)
