@@ -1,14 +1,17 @@
 #!/bin/bash -ex
-# Minimal, robust script to create, attach, and mount an OCI Block Volume for OKE nodes upon launch.
+# Minimal, robust script to create, attach, and mount an OCI Block Volume for OKE nodes
 set -euo pipefail
 
 # --- Config (override via user-data vars) ---
-VOL_SIZE_GB="${VOL_SIZE_GB:-100}"          # e.g., 100
-VPUS_PER_GB="${VPUS_PER_GB:-10}"           # 0,10,20,30
-MOUNT_POINT="${MOUNT_POINT:-/data}"        # e.g., /data
-FS_TYPE="${FS_TYPE:-xfs}"                  # xfs or ext4
-VOLUME_COMPARTMENT_OCID="${VOLUME_COMPARTMENT_OCID:-}"  # defaults to instance compartment
-ATTACH_TYPE="${ATTACH_TYPE:-paravirtualized}"           # paravirtualized or iscsi
+VOL_SIZE_GB="${VOL_SIZE_GB:-100}"          # Default: 100 GB 
+VPUS_PER_GB="${VPUS_PER_GB:-10}"           # Default: 10 VPUs. e.g., 10,20,30
+MOUNT_POINT="${MOUNT_POINT:-/data}"        # Default: /data 
+FS_TYPE="${FS_TYPE:-xfs}"                  # Default: xfs. e.g., xfs or ext4
+VOLUME_COMPARTMENT_OCID="${VOLUME_COMPARTMENT_OCID:-}"  # Defaults to instance compartment if unset or empty
+ATTACH_TYPE="${ATTACH_TYPE:-paravirtualized}"           # Default: paravirtualized. e.g., paravirtualized or iscsi
+MOUNT_OWNER="${MOUNT_OWNER:-root}"         # Default: root
+MOUNT_GROUP="${MOUNT_GROUP:-root}"         # Default: root 
+MOUNT_PERMS="${MOUNT_PERMS:-755}"          # Default: 755
 
 # --- Logging ---
 LOG_FILE="/var/log/volume-init.log"
@@ -43,8 +46,8 @@ AD=$(curl -sS -H "$H" "$MD/instance/availabilityDomain")
 COMP_OCID="${VOLUME_COMPARTMENT_OCID:-$(curl -sS -H "$H" "$MD/instance/compartmentId")}"
 REGION=$(curl -sS -H "$H" "$MD/instance/regionInfo/regionIdentifier" 2>/dev/null || curl -sS -H "$H" "$MD/instance/region" 2>/dev/null || true)
 [[ "$REGION" =~ ^[A-Z]{3}$ ]] && case "${REGION^^}" in
-  IAD) REGION="us-ashburn-1" ;; PHX) REGION="us-phoenix-1" ;; FRA) REGION="eu-frankfurt-1" ;;
-  LHR) REGION="uk-london-1" ;; AMS) REGION="eu-amsterdam-1" ;; *) REGION="${REGION,,}" ;;
+  IAD) REGION="us-ashburn-1" ;; PHX) REGION="us-phoenix-1" ;; ORD) REGION="us-chicago-1" ;; FRA) REGION="eu-frankfurt-1" ;;
+  LHR) REGION="uk-london-1" ;; AMS) REGION="eu-amsterdam-1" ;; NRT) REGION="ap-tokyo-1" ;; *) REGION="${REGION,,}" ;;
 esac
 export OCI_CLI_AUTH=instance_principal
 export OCI_CLI_REGION="${REGION:-us-ashburn-1}"
@@ -143,8 +146,25 @@ grep -qE "[[:space:]]$MOUNT_POINT[[:space:]]" /etc/fstab && { cp /etc/fstab /etc
 [ "$FS_TYPE" = "xfs" ] && echo "UUID=$UUID  $MOUNT_POINT  xfs  defaults,noatime  0 2" >> /etc/fstab || echo "UUID=$UUID  $MOUNT_POINT  ext4 defaults,noatime  0 2" >> /etc/fstab
 mount -a
 mountpoint -q "$MOUNT_POINT" || { log "Mount failed"; exit 1; }
+
+# --- Set permissions and ownership for the mount point ---
+log "Setting permissions for $MOUNT_POINT..."
+# Ensure the specified group exists (if not a numeric GID or existing group)
+if ! getent group "$MOUNT_GROUP" >/dev/null 2>&1 && ! [[ "$MOUNT_GROUP" =~ ^[0-9]+$ ]]; then
+  log "Creating group $MOUNT_GROUP..."
+  groupadd "$MOUNT_GROUP" 2>/dev/null || log "Failed to create group $MOUNT_GROUP, using default group root"
+  MOUNT_GROUP="root"
+fi
+# Set ownership using the configured owner and group
+chown -R "$MOUNT_OWNER:$MOUNT_GROUP" "$MOUNT_POINT" || log "Failed to set ownership for $MOUNT_POINT to $MOUNT_OWNER:$MOUNT_GROUP"
+# Set permissions using the configured mode
+chmod -R "$MOUNT_PERMS" "$MOUNT_POINT" || log "Failed to set permissions for $MOUNT_POINT to $MOUNT_PERMS"
+# Optional: Restore SELinux context if applicable
+command -v restorecon >/dev/null 2>&1 && restorecon -R "$MOUNT_POINT" 2>/dev/null || log "SELinux context restoration not available or failed"
+# Test file creation to verify write access (optional)
+touch "$MOUNT_POINT/testfile" && rm "$MOUNT_POINT/testfile" && log "File creation test passed at $MOUNT_POINT" || log "File creation test failed at $MOUNT_POINT (check permissions)"
+log "Permissions set for $MOUNT_POINT (owner=$MOUNT_OWNER:$MOUNT_GROUP, mode=$MOUNT_PERMS)"
 log "Mounted at $MOUNT_POINT"
-log "Success."
 
 # --- Ensure OKE init runs (critical for cluster join) ---
 if [ -f /var/run/oke-init.done ]; then
